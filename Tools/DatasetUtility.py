@@ -12,6 +12,16 @@ import Tools.LineConversion as LineConv
 import Tools.LineDataExtraction as LineData
 from skimage.morphology import skeletonize
 
+
+def _normalize_sample_stem(path):
+    stem = os.path.splitext(os.path.basename(path))[0]
+    if stem.endswith("_sat"):
+        return stem[:-4]
+    if stem.endswith("_mask"):
+        return stem[:-5]
+    return stem
+
+
 class DatasetPreprocessor(data.Dataset):
     def __init__(self, cfg, model_name, dataset_name, loader_type):
         cv2.setNumThreads(0)
@@ -27,11 +37,16 @@ class DatasetPreprocessor(data.Dataset):
         imagelabeldirs = ["train_dir", "train_label_dir"] if self.loader_type == "training_settings" else ["valid_dir", "valid_label_dir"] # change dirs for test
         pathImages = os.path.abspath(os.curdir + self.cfg["Datasets"][dataset_name][imagelabeldirs[0]])
         pathLabels = os.path.abspath(os.curdir + self.cfg["Datasets"][dataset_name][imagelabeldirs[1]])
-        imagelist = os.listdir(pathImages)
-        labellist = os.listdir(pathLabels)
-        self.image_dir = [os.path.join(pathImages,x) for x in imagelist]
-        self.label_dir = [os.path.join(pathLabels,x) for x in labellist]
-        assert (len(imagelist) == len(labellist))
+        imagelist = sorted(os.listdir(pathImages))
+        labellist = sorted(os.listdir(pathLabels))
+        image_map = {_normalize_sample_stem(x): os.path.join(pathImages, x) for x in imagelist}
+        label_map = {_normalize_sample_stem(x): os.path.join(pathLabels, x) for x in labellist}
+        shared_keys = sorted(set(image_map).intersection(label_map))
+        if not shared_keys:
+            raise RuntimeError("No paired image/label files found in dataset directories.")
+        self.image_dir = [image_map[key] for key in shared_keys]
+        self.label_dir = [label_map[key] for key in shared_keys]
+        assert len(self.image_dir) == len(self.label_dir)
         self.dataset_mean_color = np.array(eval(self.cfg["Datasets"][dataset_name]["mean"]))
         self.imagelabeldict = collections.defaultdict(list)
         
@@ -75,8 +90,8 @@ class DatasetPreprocessor(data.Dataset):
             image = cv2.warpAffine(image, rotM, (image_w, image_h))
             label = cv2.warpAffine(label, rotM, (image_w, image_h))
 
-        image = image.astype(np.float)
-        label = label.astype(np.float)
+        image = image.astype(np.float32)
+        label = label.astype(np.float32)
         
         image -= self.dataset_mean_color
 

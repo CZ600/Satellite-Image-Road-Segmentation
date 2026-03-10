@@ -43,12 +43,16 @@
 	},
 	"training_settings": 
 	{
-		"batch_size": 11,
+		"batch_size": 4,
 		"crop_size" : 256,
-        "epochs": 120,
+        "epochs": 80,
         "results_directory": "./Experiments/",
+		"checkpoint_dir": "./checkpoints",
+		"log_dir": "./logs",
+		"checkpoint_interval": 5,
 		"augment": true,
         "iteration_size": 1,
+		"num_workers": 4,
 		"roadclass" : 2,
 		"orientationclass" : 37,
 		"road_weight": 1,
@@ -58,11 +62,11 @@
     },
 	"validation_settings": 
 	{
-		"batch_size": 4,
+		"batch_size": 2,
 		"crop_size" : 512,
 		"augment": false,
 		"spacenet_crop_size" : 650,
-        "evaluation_frequency": 4
+        "evaluation_frequency": 1
     },
 	"optimizer_settings": 
 	{

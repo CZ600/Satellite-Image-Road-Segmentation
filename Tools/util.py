@@ -184,6 +184,53 @@ def fast_hist(a, b, n):
     return np.bincount(n * a[k].astype(int) + b[k], minlength=n ** 2).reshape(n, n)
 
 
+def segmentation_metrics_from_hist(hist):
+    hist = hist.astype(np.float64)
+    total = hist.sum()
+    true_positive = np.diag(hist)
+    gt = hist.sum(axis=1)
+    pred = hist.sum(axis=0)
+    union = gt + pred - true_positive
+
+    class_iou = np.divide(
+        true_positive,
+        union,
+        out=np.zeros_like(true_positive, dtype=np.float64),
+        where=union > 0,
+    )
+    road_tp = true_positive[1] if len(true_positive) > 1 else 0.0
+    road_fp = pred[1] - road_tp if len(pred) > 1 else 0.0
+    road_fn = gt[1] - road_tp if len(gt) > 1 else 0.0
+
+    precision = road_tp / (road_tp + road_fp + 1e-12)
+    recall = road_tp / (road_tp + road_fn + 1e-12)
+    pixel_accuracy = true_positive.sum() / (total + 1e-12)
+
+    return {
+        "pixel_accuracy": pixel_accuracy,
+        "miou": np.nanmean(class_iou),
+        "background_iou": class_iou[0] if len(class_iou) > 0 else 0.0,
+        "road_iou": class_iou[1] if len(class_iou) > 1 else 0.0,
+        "precision": precision,
+        "recall": recall,
+    }
+
+
+def checkpoint_state(epoch, model, optimizer, config, metrics):
+    if torch.cuda.device_count() > 1 and hasattr(model, "module"):
+        arch = type(model.module).__name__
+    else:
+        arch = type(model).__name__
+    return {
+        "arch": arch,
+        "epoch": epoch,
+        "state_dict": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "config": config,
+        "metrics": metrics,
+    }
+
+
 def save_checkpoint(epoch, loss, model, optimizer, best_accuracy, best_miou, config, experiment_dir):
 
     if torch.cuda.device_count() > 1:
